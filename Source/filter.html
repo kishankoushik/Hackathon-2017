@@ -1,0 +1,213 @@
+<!--
+Visit http://www.codingsection.com/ for such interesting articles, live demos and scripts.
+Article at: http://www.codingsection.com/getting-list-of-files-and-folders-using-google-drive-api.html
+Email: durgesh@codingsection.com
+-->
+<!DOCTYPE html>
+<html lang="en-US">
+<head>
+<meta http-equiv="content-type" content="text/html; charset=utf-8">
+<link rel="stylesheet" type="text/css" href="css/main.css">
+<title>Resume Filter</title>
+<link rel="icon" href="images/coding-fev.ico" type="image/x-icon" />
+    <style>
+        header {
+            position: fixed;
+            display: table;
+            width: 100%;
+            height: 100%;
+            background: url('https://addons.opera.com/media/CACHE/images/themes/45/226145/1.0-rev1/images/fe641615b6217acd1280e0d9100d889f/d97861518a331364ef91193f4b215c0a.jpg') no-repeat center center scroll;
+            -webkit-background-size: cover;
+            -moz-background-size: cover;
+            -o-background-size: cover;
+            background-size: cover;
+        }
+    </style>
+</head>
+<body>
+<header class="header" id="top">
+<div class="blended_grid">
+<div align="center" class="pageHeader">
+<br><br>
+    <input type="text" name="a" id="a">
+    <button onclick="search(document.getElementById('a').value)" class="btn btn-warning btn-lg">Search</button>
+</div>
+
+<div class="pageContent">
+<script type="text/javascript">
+    var CLIENT_ID = '248755245240-ave19pd9fatcka2s0qb7hf046oejnhec.apps.googleusercontent.com';
+    var SCOPES = 'https://www.googleapis.com/auth/drive';
+    var page_counter = 0;
+    var loaded_page_counter = 100;
+    
+    //Called when the client library is loaded to start the auth flow.
+    var handleClientLoad = function() {
+        window.setTimeout(checkAuth, 1);
+    }
+
+    //Check if the current user has authorized the application. This one is use to immediate check auth
+    var checkAuth = function () {
+        gapi.auth.authorize(
+            {'client_id': CLIENT_ID, 'scope': SCOPES, 'immediate': true},
+            handleAuthResult);
+    }
+    
+    //Check if the current user has authorized the application. This one is not use to immediate check auth
+    var checkAuthNonImmediate = function() {
+        gapi.auth.authorize(
+            {'client_id': CLIENT_ID, 'scope': SCOPES, 'immediate': false},
+            handleAuthResult);
+    }
+
+    //Called when authorization server replies.
+    var handleAuthResult = function(authResult) {
+        $("#authorizeButton").hide();
+        $("#authButtonText").hide();
+        if (authResult && !authResult.error){
+            retrieveAllFiles();
+        }
+        else{
+            $("#authorizeButton").show();
+            $("#authButtonText").show();
+            $("#authorizeButton").attr("onclick", "checkAuthNonImmediate();");
+        }
+    }
+      
+    //Retrieve a list of File resources.
+    function search(a) {
+        console.log(a);
+        var key = function () {
+            console.log(a);
+            var retrievePageOfFiles = function (request) {
+                request.execute(function (resp) {
+                    console.log(a);
+                    var nextPageToken = resp.nextPageToken;
+                    if (!nextPageToken) {
+                    } else {
+                        request = gapi.client.request({
+                            'path': '/drive/v2/files',
+                            'method': 'GET',
+                            'pageToken': nextPageToken,
+                            'params': {
+                                'q': "fullText contains '" + a + "'",
+
+                            }
+                        });
+                        retrievePageOfFiles(request);
+                        console.log(request);
+                    }
+                });
+            }
+            var initialRequest = gapi.client.request({
+                'path': '/drive/v2/files',
+                'method': 'GET',
+                'params': {
+                    'q': 'trashed = false'
+                }
+            });
+
+            retrievePageOfFiles(initialRequest, []);
+        }
+    }
+    var retrieveAllFiles = function()  {
+        var retrievePageOfFiles = function(request) {
+            request.execute(function(resp) {
+                displayFileList(resp.items);
+                var nextPageToken = resp.nextPageToken;
+                if (nextPageToken) {
+                    request = gapi.client.request({
+                        'path': '/drive/v2/files',
+                        'method': 'GET',
+                        'pageToken': nextPageToken,
+                        'params': {
+                            'q': 'trashed = false'
+                        }
+                    });
+                    retrievePageOfFiles(request);
+                }
+            });
+        }
+        var initialRequest = gapi.client.request({
+            'path': '/drive/v2/files',
+            'method': 'GET',
+            'params': {
+                'q': 'trashed = false'
+            }
+        });
+        retrievePageOfFiles(initialRequest, []);
+    }
+
+    // As disclosed, preventing folders to be render here - only files are allowed. 
+    var displayFileList = function(result){
+        if(result.length > 0){
+                $("#data-grid").show();
+                for(var counter = 0; counter < result.length; counter++){
+                     displayList(result[counter], 'bottom');
+                }
+            }
+    }
+
+    // Render file list with style
+    var displayList = function(result, position){
+        page_counter += 1;
+        console.log(result);
+        console.log("files"+result.files)
+        if(result.fileSize){
+            var file_size = bytesToSize(result.fileSize);
+        }
+        else{
+            var file_size = "-";
+        }
+        if(page_counter > 100){
+            $("#load_more").show();
+        }
+        if(result.embedLink){
+            var link = result.embedLink;
+        }
+        else{
+            var link = result.alternateLink;
+        }
+
+        if(page_counter <= 100){
+            var str = "<tr class='tr_body' id='file"+page_counter+"'><td><img class='file_icon' src='"+result.iconLink+"' /><a class='title_link' target='_blank' href='"+link+"'>"+result.title+"</td><td>"+result.lastModifyingUserName+"</td><td>"+(result.modifiedDate).split("T")[0]+"</td><td>"+file_size+"</td>";
+        }
+        else{
+            var str = "<tr class='tr_body' id='file"+page_counter+"' style='display: none;'><td><img class='file_icon' src='"+result.iconLink+"' /><a class='title_link' target='_blank' href='"+link+"'>"+result.title+"</td><td>"+result.lastModifyingUserName+"</td><td>"+(result.modifiedDate).split("T")[0]+"</td><td>"+file_size+"</td>";
+        }
+        
+        $("#table-grid").append(str);
+    }
+    
+    // By default 100 records will appear. Load more 100 on request
+    var load_more_hundred = function(){
+        var next_limit = loaded_page_counter + 100;
+        for(var counter = loaded_page_counter + 1; counter <= next_limit; counter++){
+          $("#file" + counter).show();
+        }
+        loaded_page_counter = next_limit;
+    }
+    
+    //Generic function to convert size in readable format
+    var bytesToSize = function(bytes) {
+        var sizes = ['Bytes', 'KB', 'MB', 'GB', 'TB'];
+        if (bytes == 0) return '0 Byte';
+        var i = parseInt(Math.floor(Math.log(bytes) / Math.log(1024)));
+        return Math.round(bytes / Math.pow(1024, i), 2) + ' ' + sizes[i];
+    };
+</script>
+
+<div id="data-grid" style="display: none;">
+    <table id='table-grid'><tr class='tr_head'><th align='left' class='file_name'>Name of the file</th><th align='left' class='file_owner'>Owner</th><th align='left' class='last_modified'>Last Modified</th><th align='left' class='file_size'>File Size</th></tr></table><br />
+    <a id="load_more" onclick="load_more_hundred();">Load more files...</a>
+</div>
+<div>
+    <div id="authButtonText" style="padding-bottom: 5px; display: none;">Connect yourself to your Google Drive first for this demo.</div><input type="button" id="authorizeButton" style="display: none; height: 30px; cursor: pointer;" value="Connect To Your Google Drive" />
+    </div>
+   <script src="https://ajax.googleapis.com/ajax/libs/jquery/1.11.2/jquery.min.js"></script>
+   <script type="text/javascript" src="https://apis.google.com/js/client.js?onload=handleClientLoad"></script>
+</div>
+
+</div>
+</header>
+</body>
+</html>
